@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>NYC Layers – Leaflet</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background: #111;
+      }
+
+      #map {
+        width: 100%;
+        height: 100%;
+      }
+
+      .leaflet-container {
+        background: #000;
+      }
+
+      .custom-layer-control {
+        background: rgba(20, 20, 20, 0.9);
+        padding: 8px 10px;
+        border-radius: 8px;
+        box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+        font-size: 12px;
+        color: #f2f2f2;
+        backdrop-filter: blur(12px);
+      }
+
+      .toggle-buttons {
+        display: flex;
+        gap: 6px;
+      }
+
+      .toggle-btn {
+        border-radius: 999px;
+        padding: 5px 10px;
+        cursor: pointer;
+        background: #2a2a2a;
+        color: #b3b3b3;
+        font-size: 11px;
+        border: 1px solid #333;
+        text-transform: capitalize;
+        transition: background 0.15s ease, color 0.15s ease;
+      }
+
+      .toggle-btn.active {
+        background: #1db954;
+        color: #000000;
+        border-color: #1db954;
+        font-weight: 600;
+      }
+
+      .leaflet-popup-content-wrapper {
+        background: rgba(0, 0, 0, 0.85);
+        color: #ffffff;
+        border-radius: 6px;
+      }
+
+      .leaflet-popup-tip {
+        background: rgba(0, 0, 0, 0.85);
+      }
+
+      .leaflet-popup-content {
+        margin: 8px 10px;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+      let map;
+      let fountainsLayer;
+      let heatLayer;
+      let treesLayer;
+
+      const DATA_CONFIG = {
+        fountains: {
+          url: "NYC_Parks_Drinking_Fountains_20251117.geojson",
+          color: "#1db954",
+          title: "Drinking Fountain",
+          style: { radius: 4, weight: 1, fillOpacity: 0.9 }
+        },
+        trees: {
+          url: "NYC_Street_Trees.geojson",
+          color: "#7e3073",
+          title: "Street Tree",
+          style: { radius: 5, weight: 1, fillOpacity: 0.9 }
+        },
+        heat: {
+          url: "NYC_Heat_Vulnerability.geojson",
+          color: "#ff0000",
+          title: "Heat Zone",
+          style: { weight: 2, fillOpacity: 0.5 }
+        }
+      };
+
+      function initApp() {
+        initMap();
+        createOverlayLayers();
+        createLayerToggleControl();
+        loadGeoJsonLayer("fountains", fountainsLayer);
+      }
+
+      function initMap() {
+        map = L.map("map", {
+          center: [40.7128, -74.006],
+          zoom: 11,
+          zoomControl: true
+        });
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: "&copy; OpenStreetMap contributors"
+        }).addTo(map);
+      }
+
+      function createOverlayLayers() {
+        fountainsLayer = L.layerGroup().addTo(map);
+        heatLayer = L.layerGroup();
+        treesLayer = L.layerGroup();
+      }
+
+      function createLayerToggleControl() {
+        const control = L.control({ position: "topright" });
+
+        control.onAdd = function () {
+          const container = L.DomUtil.create(
+            "div",
+            "custom-layer-control leaflet-bar"
+          );
+
+          container.innerHTML = `
+            <div class="toggle-buttons">
+              <button class="toggle-btn active" data-layer="fountains">Fountains</button>
+              <button class="toggle-btn" data-layer="heat">Heat</button>
+              <button class="toggle-btn" data-layer="trees">Trees</button>
+            </div>
+          `;
+
+          L.DomEvent.disableClickPropagation(container);
+          L.DomEvent.disableScrollPropagation(container);
+
+          const layerMap = {
+            fountains: fountainsLayer,
+            heat: heatLayer,
+            trees: treesLayer
+          };
+
+          container.querySelectorAll(".toggle-btn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const key = btn.getAttribute("data-layer");
+              const layer = layerMap[key];
+
+              if (btn.classList.contains("active")) {
+                btn.classList.remove("active");
+                if (map.hasLayer(layer)) map.removeLayer(layer);
+              } else {
+                btn.classList.add("active");
+                if (!map.hasLayer(layer)) map.addLayer(layer);
+              }
+            });
+          });
+
+          return container;
+        };
+
+        control.addTo(map);
+      }
+
+      function loadGeoJsonLayer(key, targetLayerGroup) {
+        const config = DATA_CONFIG[key];
+
+        fetch(config.url)
+          .then((response) => {
+            if (!response.ok) throw new Error(`Failed to load ${key} data.`);
+            return response.json();
+          })
+          .then((geojson) => {
+            const geoJsonLayer = L.geoJSON(geojson, {
+              pointToLayer: (feature, latlng) => {
+                if (key === "fountains" || key === "trees") {
+                  return L.circleMarker(latlng, {
+                    radius: config.style.radius,
+                    fillColor: config.color,
+                    color: "#ffffff",
+                    weight: config.style.weight,
+                    opacity: 1,
+                    fillOpacity: config.style.fillOpacity
+                  });
+                }
+                return L.marker(latlng);
+              },
+              style: () => {
+                if (key === "heat") {
+                  return {
+                    fillColor: config.color,
+                    color: config.color,
+                    weight: config.style.weight,
+                    fillOpacity: config.style.fillOpacity
+                  };
+                }
+                return {};
+              },
+              onEachFeature: (feature, layer) => {
+                const p = feature.properties || {};
+                let popup = `<strong>${config.title}</strong><br>`;
+
+                Object.keys(p).forEach((propKey) => {
+                  if (p[propKey] && propKey.length < 20) {
+                    popup += `<b>${propKey}:</b> ${p[propKey]}<br>`;
+                  }
+                });
+
+                layer.bindPopup(popup);
+              }
+            });
+
+            targetLayerGroup.addLayer(geoJsonLayer);
+
+            if (key === "fountains") {
+              try {
+                map.fitBounds(geoJsonLayer.getBounds());
+              } catch (e) {
+                console.warn("Could not fit bounds for fountains layer:", e);
+              }
+            }
+          })
+          .catch((error) => {
+            console.error(`Error loading GeoJSON for ${key}:`, error);
+            const btn = document.querySelector(
+              `.toggle-btn[data-layer="${key}"]`
+            );
+            if (btn) {
+              btn.disabled = true;
+              btn.classList.remove("active");
+            }
+          });
+      }
+
+      document.addEventListener("DOMContentLoaded", initApp);
+    </script>
+  </body>
+</html>
