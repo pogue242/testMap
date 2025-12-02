@@ -78,6 +78,46 @@
         margin: 8px 10px;
         font-size: 12px;
       }
+
+      /* Legend styles */
+      .legend {
+        margin-top: 6px;
+        padding-top: 4px;
+        border-top: 1px solid #444;
+        font-size: 11px;
+        line-height: 1.4;
+      }
+
+      .legend-row {
+        display: flex;
+        align-items: center;
+        margin-top: 2px;
+      }
+
+      .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 6px;
+        border: 1px solid #ffffff;
+      }
+
+      .fountains-dot {
+        background: #1db954;
+      }
+
+      .trees-dot {
+        background: #7e3073;
+      }
+
+      .legend-swatch {
+        width: 40px;
+        height: 10px;
+        margin-right: 6px;
+        background: linear-gradient(to right, #000000, #ffffff);
+        border-radius: 2px;
+        border: 1px solid #ffffff33;
+      }
     </style>
   </head>
 
@@ -141,7 +181,6 @@
       }
 
       function createHeatOverlays() {
-        // bounds from make_heat_layers.py (south, west, north, east)
         const heat2015Bounds = [
           [40.49587334505121, -74.25572953213218],
           [40.91763237094533, -73.70003169737585]
@@ -184,6 +223,21 @@
               <button class="toggle-btn" data-layer="heat2025">2025 Heat</button>
               <button class="toggle-btn" data-layer="trees">Trees</button>
             </div>
+            <div class="legend">
+              <div><strong>Legend</strong></div>
+              <div class="legend-row">
+                <span class="legend-dot fountains-dot"></span>
+                <span>Fountains</span>
+              </div>
+              <div class="legend-row">
+                <span class="legend-dot trees-dot"></span>
+                <span>Trees</span>
+              </div>
+              <div class="legend-row">
+                <span class="legend-swatch"></span>
+                <span>Heat (cooler → hotter)</span>
+              </div>
+            </div>
           `;
 
           L.DomEvent.disableClickPropagation(container);
@@ -224,7 +278,7 @@
 
       function loadGeoJsonLayer(key, targetLayerGroup) {
         const config = DATA_CONFIG[key];
-        if (!config) return; // safety guard
+        if (!config) return;
 
         fetch(config.url)
           .then((response) => {
