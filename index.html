@@ -40,9 +40,23 @@
         backdrop-filter: blur(12px);
       }
 
-      .toggle-buttons {
+      .section-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #888;
+        margin-bottom: 4px;
+      }
+
+      .base-toggle-buttons,
+      .overlay-toggle-buttons {
         display: flex;
         gap: 6px;
+        margin-bottom: 6px;
+      }
+
+      .overlay-toggle-buttons {
+        margin-bottom: 0;
       }
 
       .toggle-btn {
@@ -54,7 +68,8 @@
         font-size: 11px;
         border: 1px solid #333;
         text-transform: capitalize;
-        transition: background 0.15s ease, color 0.15s ease;
+        transition: background 0.15s ease, color 0.15s ease,
+          border-color 0.15s ease;
       }
 
       .toggle-btn.active {
@@ -92,6 +107,10 @@
       let heatLayer;
       let treesLayer;
 
+      // Base layers (Map / Satellite / Dark)
+      let baseLayers = {};
+      let currentBaseLayerKey = "default";
+
       const DATA_CONFIG = {
         fountains: {
           url: "NYC_Parks_Drinking_Fountains_20251117.geojson",
@@ -127,10 +146,52 @@
           zoomControl: true
         });
 
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19,
-          attribution: "&copy; OpenStreetMap contributors"
-        }).addTo(map);
+        // "Current view" / default: light, minimal POIs, keeps street names
+        baseLayers.default = L.tileLayer(
+          "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+          {
+            maxZoom: 19,
+            attribution:
+              '&copy; OpenStreetMap contributors &copy; CARTO'
+          }
+        );
+
+        // Satellite imagery
+        baseLayers.satellite = L.tileLayer(
+          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+          {
+            maxZoom: 19,
+            attribution:
+              "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
+          }
+        );
+
+        // Dark mode base map
+        baseLayers.dark = L.tileLayer(
+          "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+          {
+            maxZoom: 19,
+            attribution:
+              '&copy; OpenStreetMap contributors &copy; CARTO'
+          }
+        );
+
+        // Start with the "current view" / default
+        baseLayers.default.addTo(map);
+        currentBaseLayerKey = "default";
+      }
+
+      function switchBaseLayer(key) {
+        if (!baseLayers[key] || key === currentBaseLayerKey) return;
+
+        // Remove current base layer
+        if (baseLayers[currentBaseLayerKey]) {
+          map.removeLayer(baseLayers[currentBaseLayerKey]);
+        }
+
+        // Add selected base layer
+        baseLayers[key].addTo(map);
+        currentBaseLayerKey = key;
       }
 
       function createOverlayLayers() {
@@ -149,7 +210,14 @@
           );
 
           container.innerHTML = `
-            <div class="toggle-buttons">
+            <div class="section-label">Base map</div>
+            <div class="base-toggle-buttons">
+              <button class="toggle-btn base-btn active" data-base="default">Map</button>
+              <button class="toggle-btn base-btn" data-base="satellite">Satellite</button>
+              <button class="toggle-btn base-btn" data-base="dark">Dark</button>
+            </div>
+            <div class="section-label">Layers</div>
+            <div class="overlay-toggle-buttons">
               <button class="toggle-btn active" data-layer="fountains">Fountains</button>
               <button class="toggle-btn" data-layer="heat">Heat</button>
               <button class="toggle-btn" data-layer="trees">Trees</button>
@@ -159,26 +227,47 @@
           L.DomEvent.disableClickPropagation(container);
           L.DomEvent.disableScrollPropagation(container);
 
+          // Base layer buttons (Map / Satellite / Dark)
+          const baseButtons = container.querySelectorAll(".base-btn");
+          baseButtons.forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const key = btn.getAttribute("data-base");
+              switchBaseLayer(key);
+
+              // Update active state (radio-style)
+              baseButtons.forEach((b) => b.classList.remove("active"));
+              btn.classList.add("active");
+            });
+          });
+
+          // Overlay toggle buttons (multi-select)
           const layerMap = {
             fountains: fountainsLayer,
             heat: heatLayer,
             trees: treesLayer
           };
 
-          container.querySelectorAll(".toggle-btn").forEach((btn) => {
-            btn.addEventListener("click", () => {
-              const key = btn.getAttribute("data-layer");
-              const layer = layerMap[key];
+          container
+            .querySelectorAll(".overlay-toggle-buttons .toggle-btn")
+            .forEach((btn) => {
+              btn.addEventListener("click", () => {
+                const key = btn.getAttribute("data-layer");
+                const layer = layerMap[key];
 
-              if (btn.classList.contains("active")) {
-                btn.classList.remove("active");
-                if (map.hasLayer(layer)) map.removeLayer(layer);
-              } else {
-                btn.classList.add("active");
-                if (!map.hasLayer(layer)) map.addLayer(layer);
-              }
+                if (btn.classList.contains("active")) {
+                  btn.classList.remove("active");
+                  if (map.hasLayer(layer)) map.removeLayer(layer);
+                } else {
+                  btn.classList.add("active");
+                  if (!map.hasLayer(layer)) map.addLayer(layer);
+
+                  // Lazy-load GeoJSON if needed
+                  if (layer.getLayers().length === 0) {
+                    loadGeoJsonLayer(key, layer);
+                  }
+                }
+              });
             });
-          });
 
           return container;
         };
