@@ -91,7 +91,7 @@
       .legend-row {
         display: flex;
         align-items: center;
-        margin-top: 2px;
+        margin-top: 4px;
       }
 
       .legend-dot {
@@ -110,13 +110,39 @@
         background: #7e3073;
       }
 
+      /* Heat legend */
+      .legend-heat-row {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
       .legend-swatch {
-        width: 40px;
+        width: 120px;
         height: 10px;
-        margin-right: 6px;
-        background: linear-gradient(to right, #000000, #ffffff);
+        margin: 2px 0 2px 0;
         border-radius: 2px;
         border: 1px solid #ffffff33;
+        /* Approximate "matlab"/jet colormap: blue -> cyan -> yellow -> red */
+        background: linear-gradient(
+          to right,
+          #0000ff,
+          #00ffff,
+          #00ff00,
+          #ffff00,
+          #ff7f00,
+          #ff0000
+        );
+      }
+
+      .legend-heat-labels {
+        display: flex;
+        justify-content: space-between;
+        width: 120px;
+      }
+
+      .legend-heat-labels span {
+        font-size: 10px;
+        color: #dddddd;
       }
     </style>
   </head>
@@ -233,9 +259,16 @@
                 <span class="legend-dot trees-dot"></span>
                 <span>Trees</span>
               </div>
-              <div class="legend-row">
+              <div class="legend-row legend-heat-row">
+                <span>Summer surface temperature (°F)</span>
                 <span class="legend-swatch"></span>
-                <span>Heat (cooler → hotter)</span>
+                <div class="legend-heat-labels">
+                  <!-- Adjust these numbers to match your actual min/max °F from Python -->
+                  <span>75°</span>
+                  <span>85°</span>
+                  <span>95°</span>
+                  <span>105°</span>
+                </div>
               </div>
             </div>
           `;
