@@ -89,7 +89,8 @@
     <script>
       let map;
       let fountainsLayer;
-      let heatLayer;
+      let heat2015Layer;
+      let heat2025Layer;
       let treesLayer;
 
       const DATA_CONFIG = {
@@ -104,18 +105,13 @@
           color: "#7e3073",
           title: "Street Tree",
           style: { radius: 5, weight: 1, fillOpacity: 0.9 }
-        },
-        heat: {
-          url: "NYC_Heat_Vulnerability.geojson",
-          color: "#ff0000",
-          title: "Heat Zone",
-          style: { weight: 2, fillOpacity: 0.5 }
         }
       };
 
       function initApp() {
         initMap();
         createOverlayLayers();
+        createHeatOverlays();
         createLayerToggleControl();
         loadGeoJsonLayer("fountains", fountainsLayer);
       }
@@ -127,7 +123,6 @@
           zoomControl: true
         });
 
-        // Changed: use a Carto basemap with fewer POI icons (keeps streets & labels)
         L.tileLayer(
           "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
           {
@@ -140,8 +135,37 @@
 
       function createOverlayLayers() {
         fountainsLayer = L.layerGroup().addTo(map);
-        heatLayer = L.layerGroup();
+        heat2015Layer = L.layerGroup();
+        heat2025Layer = L.layerGroup();
         treesLayer = L.layerGroup();
+      }
+
+      function createHeatOverlays() {
+        // bounds from make_heat_layers.py (south, west, north, east)
+        const heat2015Bounds = [
+          [40.49587334505121, -74.25572953213218],
+          [40.91763237094533, -73.70003169737585]
+        ];
+
+        const heat2025Bounds = [
+          [40.49587334505121, -74.25572953213218],
+          [40.91763237094533, -73.70003169737585]
+        ];
+
+        const heat2015Overlay = L.imageOverlay(
+          "heat_2015F_smooth.png",
+          heat2015Bounds,
+          { opacity: 0.5 }
+        );
+
+        const heat2025Overlay = L.imageOverlay(
+          "heat_2025F_smooth.png",
+          heat2025Bounds,
+          { opacity: 0.5 }
+        );
+
+        heat2015Layer.addLayer(heat2015Overlay);
+        heat2025Layer.addLayer(heat2025Overlay);
       }
 
       function createLayerToggleControl() {
@@ -156,7 +180,8 @@
           container.innerHTML = `
             <div class="toggle-buttons">
               <button class="toggle-btn active" data-layer="fountains">Fountains</button>
-              <button class="toggle-btn" data-layer="heat">Heat</button>
+              <button class="toggle-btn" data-layer="heat2015">2015 Heat</button>
+              <button class="toggle-btn" data-layer="heat2025">2025 Heat</button>
               <button class="toggle-btn" data-layer="trees">Trees</button>
             </div>
           `;
@@ -166,7 +191,8 @@
 
           const layerMap = {
             fountains: fountainsLayer,
-            heat: heatLayer,
+            heat2015: heat2015Layer,
+            heat2025: heat2025Layer,
             trees: treesLayer
           };
 
@@ -182,8 +208,8 @@
                 btn.classList.add("active");
                 if (!map.hasLayer(layer)) map.addLayer(layer);
 
-                // Lazy-load if layer is empty
-                if (layer.getLayers().length === 0) {
+                // Lazy-load only for GeoJSON layers we have config for (fountains/trees)
+                if (layer.getLayers().length === 0 && DATA_CONFIG[key]) {
                   loadGeoJsonLayer(key, layer);
                 }
               }
@@ -198,6 +224,7 @@
 
       function loadGeoJsonLayer(key, targetLayerGroup) {
         const config = DATA_CONFIG[key];
+        if (!config) return; // safety guard
 
         fetch(config.url)
           .then((response) => {
@@ -218,17 +245,6 @@
                   });
                 }
                 return L.marker(latlng);
-              },
-              style: () => {
-                if (key === "heat") {
-                  return {
-                    fillColor: config.color,
-                    color: config.color,
-                    weight: config.style.weight,
-                    fillOpacity: config.style.fillOpacity
-                  };
-                }
-                return {};
               },
               onEachFeature: (feature, layer) => {
                 const p = feature.properties || {};
