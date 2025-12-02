@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -110,7 +110,6 @@
         background: #7e3073;
       }
 
-      /* Heat legend */
       .legend-heat-row {
         flex-direction: column;
         align-items: flex-start;
@@ -122,7 +121,7 @@
         margin: 2px 0 2px 0;
         border-radius: 2px;
         border: 1px solid #ffffff33;
-        /* Approximate "matlab"/jet colormap: blue -> cyan -> yellow -> red */
+        /* blue -> cyan -> green -> yellow -> orange -> red */
         background: linear-gradient(
           to right,
           #0000ff,
@@ -263,11 +262,10 @@
                 <span>Summer surface temperature (°F)</span>
                 <span class="legend-swatch"></span>
                 <div class="legend-heat-labels">
-                  <!-- Adjust these numbers to match your actual min/max °F from Python -->
-                  <span>75°</span>
-                  <span>85°</span>
-                  <span>95°</span>
-                  <span>105°</span>
+                  <span>80°</span>
+                  <span>90°</span>
+                  <span>100°</span>
+                  <span>110°</span>
                 </div>
               </div>
             </div>
@@ -287,17 +285,39 @@
             btn.addEventListener("click", () => {
               const key = btn.getAttribute("data-layer");
               const layer = layerMap[key];
+              const isActive = btn.classList.contains("active");
 
-              if (btn.classList.contains("active")) {
+              if (isActive) {
+                // turn OFF this layer
                 btn.classList.remove("active");
                 if (map.hasLayer(layer)) map.removeLayer(layer);
               } else {
+                // turn ON this layer
                 btn.classList.add("active");
                 if (!map.hasLayer(layer)) map.addLayer(layer);
 
-                // Lazy-load only for GeoJSON layers we have config for (fountains/trees)
+                // lazy-load GeoJSON if needed
                 if (layer.getLayers().length === 0 && DATA_CONFIG[key]) {
                   loadGeoJsonLayer(key, layer);
+                }
+
+                // make heat layers mutually exclusive
+                if (key === "heat2015") {
+                  const otherBtn = container.querySelector(
+                    '.toggle-btn[data-layer="heat2025"]'
+                  );
+                  if (otherBtn && otherBtn.classList.contains("active")) {
+                    otherBtn.classList.remove("active");
+                    if (map.hasLayer(heat2025Layer)) map.removeLayer(heat2025Layer);
+                  }
+                } else if (key === "heat2025") {
+                  const otherBtn = container.querySelector(
+                    '.toggle-btn[data-layer="heat2015"]'
+                  );
+                  if (otherBtn && otherBtn.classList.contains("active")) {
+                    otherBtn.classList.remove("active");
+                    if (map.hasLayer(heat2015Layer)) map.removeLayer(heat2015Layer);
+                  }
                 }
               }
             });
@@ -358,7 +378,7 @@
             }
           })
           .catch((error) => {
-            console.error(`Error loading GeoJSON for ${key}:`, error);
+            console.error(`Error loading GeoJSON for ${key} data:`, error);
             const btn = document.querySelector(
               `.toggle-btn[data-layer="${key}"]`
             );
